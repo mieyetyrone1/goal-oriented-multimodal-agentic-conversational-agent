@@ -4,22 +4,24 @@ This project implements a modular, goal-oriented conversational agent following 
 The system is designed to evolve incrementally, starting from a core agent loop and expanding to include reflection, memory management, retrieval-augmented generation (RAG), and Model Context Protocol (MCP).
 
 ## Current Status
-**Week 1 – Core Agent Loop**
-- LLM wrapper using OpenAI-compatible APIs
-- LLM-driven planner for tool vs. response decisions
-- Tool abstraction and execution
-- Conversation memory management
+**Week 2 – Reflection & Memory Management**
+- Periodic reflection using LLM-generated summaries
+- Configurable context window and reflection frequency
+- Separation of conversational memory and reflective state
+- Foundation for long-horizon planning and RAG
 
-## Architecture (Week 1)
+## Architecture (Week 2)
 User Input
    ↓
 Planner (LLM-driven)
    ↓
 Tool Execution (if needed)
    ↓
+LLM Response
+   ↓
 Memory Update
    ↓
-LLM Response
+Reflection (periodic)
 
 ## Setup (Windows)
 
