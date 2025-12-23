@@ -6,9 +6,10 @@ class LLMWrapper:
     A wrapper for OpenAI-compatible API.
     """
 
-    def __init__(self, client: OpenAI, model: str):
+    def __init__(self, client: OpenAI, model: str, embedding_model: str):
         self.client = client
         self.model = model
+        self.embedding_model = embedding_model
 
     def generate(self, messages: List[Dict[str, str]]) -> str:
         """
@@ -21,3 +22,4 @@ class LLMWrapper:
         # return response.choices[0].message["content"]
         # HuggingFace ChatCompletion returns ChatCompletionMessage object
         return response.choices[0].message.content
+    
