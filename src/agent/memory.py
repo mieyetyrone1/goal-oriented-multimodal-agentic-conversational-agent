@@ -60,3 +60,12 @@ class Memory:
             messages = messages[-last_n:]
         return messages
 
+    def get_latest(self, role: str):
+        """
+        Return the content of the most recent message with the given role.
+        Returns None if no such message exists.
+        """
+        for msg in reversed(self.history):
+            if msg["role"] == role:
+                return msg["content"]
+        return None

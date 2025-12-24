@@ -8,6 +8,8 @@ from agent.reflection import Reflection
 from tools.simple_tool import SimpleCalculatorTool
 from agent.retrieval.embedding_model import EmbeddingModel
 from agent.retrieval.retrieval_helper import build_retrieval_context
+from agent.context.controller import ContextController
+from agent.context.packet import ContextPacket
 
 REFLECTION_INTERVAL = 4  # reflection generation period
 CONTEXT_WINDOW_SIZE = 10  # how many messages to include in reflection
@@ -34,6 +36,8 @@ reflection = Reflection(llm, context_window_size=CONTEXT_WINDOW_SIZE)
 embedding_model = EmbeddingModel()
 tools = {"SimpleCalculatorTool": SimpleCalculatorTool()}
 
+context_controller = ContextController()
+
 # Temporary document store
 DOCUMENTS = [
     {"id": "supervised", "content": "Supervised learning uses labeled data where each input has a known output."},
@@ -52,6 +56,9 @@ while True:
     if user_input.lower() in {"exit", "quit"}:
         break
     
+    # Advance MCP context lifecycle
+    context_controller.step()
+
     # Planning
     plan = planner.plan(
         user_input=user_input,
@@ -82,33 +89,57 @@ while True:
     )
     print("[DEBUG] Retrieval context:\n", retrieval_context)
 
-    # LLM Response
-    llm_messages = []
-
     if retrieval_context:
-        llm_messages.append({
-            "role": "system",
-            "content": retrieval_context
-        })
+        context_controller.add(
+            ContextPacket(
+                type="retrieved_knowledge",
+                content=retrieval_context,
+                source="retriever",
+                ttl=1,
+                priority=2
+            )
+        )
 
-    llm_messages.extend(
-        memory.get_llm_messages(
-            roles=["user", "assistant"],
-            last_n=CONTEXT_WINDOW_SIZE
+    # Reflection (read-only injection)
+    latest_reflection = memory.get_latest(role="reflection")
+    if latest_reflection:
+        context_controller.add(
+            ContextPacket(
+                type="reflection",
+                content=latest_reflection,
+                source="reflection",
+                ttl=5,
+                priority=0
+            )
+        )
+
+    # Conversation Memory
+    context_controller.add(
+        ContextPacket(
+            type="conversation",
+            content=memory.get_llm_messages(
+                roles=["user", "assistant"],
+                last_n=CONTEXT_WINDOW_SIZE
+            ),
+            source="memory",
+            ttl=-1,
+            priority=1
         )
     )
 
+    # LLM Invocation
+    llm_messages = context_controller.build_messages()
     llm_messages.append({"role": "user", "content": user_input})
 
     llm_response = llm.generate(llm_messages)
 
     print(f"Agent: {llm_response}")
 
-    # -------- Store memory --------
+    # Store Memory
     memory.add(role="user", content=user_input)
     memory.add(role="assistant", content=llm_response)
 
-    # Reflection
+    # Reflection Generation
     if len(memory.get()) % REFLECTION_INTERVAL == 0:
         summary = reflection.reflect(
             memory.get_llm_messages(

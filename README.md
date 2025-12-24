@@ -4,30 +4,42 @@ This project implements a modular, goal-oriented conversational agent following 
 The system is designed to evolve incrementally, starting from a core agent loop and expanding to include reflection, memory management, retrieval-augmented generation (RAG), and Model Context Protocol (MCP).
 
 ## Current Status
-**Week 3 – Retrieval-Augmented Generation (RAG)**
-- Embedding-based document retrieval using cosine similarity
-- Planner-compatible retrieval as an agent tool
-- Relevance scoring with configurable similarity thresholds
-- Ephemeral context injection (retrieved knowledge is not stored in memory)
-- Source-aware responses with deterministic citations
-- Clean separation between conversational memory, reflective memory, and retrieved context
+**Week 4 – Model Context Protocol (MCP)**
+- Explicit context packets with type, source, priority, and lifetime (TTL)
+- Centralized context controller for assembling LLM prompts
+- Clear separation between:
+  - Conversational memory
+  - Reflective memory
+  - Retrieved knowledge (RAG)
+- Ephemeral retrieval context (no memory pollution)
+- Reflection-aware context injection
+- Deterministic, inspectable prompt construction
+- Planner-compatible context orchestration
 
-Retrieved documents are injected only for the current generation step and are never written to long-term memory, preserving clear memory boundaries and enabling future MCP-based context control.
+MCP serves as the control plane for all context entering the model, enabling predictable behavior, safe memory boundaries, and future extensibility.
 
-## Architecture (Week 3)
+## Architecture (Week 4)
 User Input  
 ↓  
 Planner (LLM-driven)  
 ↓  
-Tool Execution (if needed, including retrieval)  
+Tool Execution (if needed)  
 ↓  
 Retrieval (Embedding Similarity Search)  
 ↓  
-LLM Response (with grounded context and citations)  
+Context Assembly (MCP)  
+↓  
+LLM Response  
 ↓  
 Memory Update  
 ↓  
 Reflection (periodic)
+
+Context Types Managed by MCP:
+- Conversation history (persistent)
+- Retrieved knowledge (TTL-scoped)
+- Reflection summaries (medium-lived)
+- System-level instructions
 
 ## Setup (Windows)
 
