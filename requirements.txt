@@ -1,3 +1,8 @@
 openai
 python-dotenv
 sentence-transformers
+sounddevice 
+numpy
+faster-whisper 
+torch
+pyttsx3

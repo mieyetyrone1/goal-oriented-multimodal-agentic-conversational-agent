@@ -10,6 +10,11 @@ from agent.retrieval.embedding_model import EmbeddingModel
 from agent.retrieval.retrieval_helper import build_retrieval_context
 from agent.context.controller import ContextController
 from agent.context.packet import ContextPacket
+from speech.audio_controller import AudioController
+from speech.mic_capture import record_until_enter
+from speech.stt import WhisperSTT
+from speech.tts import WindowsTTS
+
 
 REFLECTION_INTERVAL = 4  # reflection generation period
 CONTEXT_WINDOW_SIZE = 10  # how many messages to include in reflection
@@ -45,19 +50,49 @@ DOCUMENTS = [
     {"id": "reinforcement", "content": "Reinforcement learning trains agents using rewards and penalties."},
 ]
 
-print("Agent is running. Type 'exit' to quit.\n")
+# Initialize speech
+audio = AudioController()
+stt = WhisperSTT(model_size="base")
+tts = WindowsTTS(rate=150)
+
+print("Agent is running. Press ENTER to talk, type 'exit' to quit.\n")
 
 # Agent loop
 
 while True:
-    user_input = input("User: ").strip()
-    if not user_input:
-        continue
-    if user_input.lower() in {"exit", "quit"}:
+    # Input mode selection
+    mode = input("\nChoose input mode ([A]udio / [T]ext, type 'exit' to quit): ").strip().lower()
+    if mode in {"exit", "quit"}:
         break
-    
-    # Advance MCP context lifecycle
-    context_controller.step()
+
+    # Audio input
+    if mode in {"a", "audio"}:
+        print("Press ENTER to start talking...")
+        input()  # Wait for push-to-talk
+        audio.begin_listening()
+        audio_data = record_until_enter()
+        audio.end_listening()
+        user_input = stt.transcribe(audio_data)
+        print(f"User (transcribed): {user_input}")
+    # Text input
+    elif mode in {"t", "text"}:
+        user_input = input("User: ").strip()
+        if not user_input:
+            continue
+    else:
+        print("Invalid input mode. Please choose 'A' or 'T'.")
+        continue
+
+    # Record audio state in MCP
+    audio_packet = ContextPacket(
+        type="conversation",
+        content=[],
+        source="audio",
+        ttl=1,  # lasts 1 turn
+        priority=10,
+        metadata={"audio_state": audio.state}
+    )
+    context_controller.add(audio_packet)
 
     # Planning
     plan = planner.plan(
@@ -89,55 +124,40 @@ while True:
     )
     print("[DEBUG] Retrieval context:\n", retrieval_context)
 
+    # LLM Response
+    llm_messages = []
+
     if retrieval_context:
-        context_controller.add(
-            ContextPacket(
-                type="retrieved_knowledge",
-                content=retrieval_context,
-                source="retriever",
-                ttl=1,
-                priority=2
-            )
-        )
+        llm_messages.append({"role": "system", "content": retrieval_context})
 
-    # Reflection (read-only injection)
-    latest_reflection = memory.get_latest(role="reflection")
-    if latest_reflection:
-        context_controller.add(
-            ContextPacket(
-                type="reflection",
-                content=latest_reflection,
-                source="reflection",
-                ttl=5,
-                priority=0
-            )
-        )
-
-    # Conversation Memory
-    context_controller.add(
-        ContextPacket(
-            type="conversation",
-            content=memory.get_llm_messages(
-                roles=["user", "assistant"],
-                last_n=CONTEXT_WINDOW_SIZE
-            ),
-            source="memory",
-            ttl=-1,
-            priority=1
+    llm_messages.extend(
+        memory.get_llm_messages(
+            roles=["user", "assistant"],
+            last_n=CONTEXT_WINDOW_SIZE
         )
     )
 
-    # LLM Invocation
-    llm_messages = context_controller.build_messages()
     llm_messages.append({"role": "user", "content": user_input})
 
     llm_response = llm.generate(llm_messages)
-
-    print(f"Agent: {llm_response}")
-
-    # Store Memory
     memory.add(role="user", content=user_input)
     memory.add(role="assistant", content=llm_response)
+
+    # Record audio state before speaking
+    audio_packet = ContextPacket(
+        type="conversation",
+        content=[],
+        source="audio",
+        ttl=1,
+        priority=10,
+        metadata={"audio_state": audio.state}  # should be SPEAKING
+    )
+    context_controller.add(audio_packet)
+
+    # Speech Output (TTS)
+    audio.begin_speaking()
+    tts.speak(llm_response)
+    audio.end_speaking()
 
     # Reflection Generation
     if len(memory.get()) % REFLECTION_INTERVAL == 0:
@@ -149,3 +169,7 @@ while True:
         )
         memory.add(role="reflection", content=summary)
         print(f"[DEBUG] Reflection Summary:\n{summary}\n")
+
+    # Step MCP packets
+    context_controller.step()
+    print("[MCP] Active packets:", context_controller.dump())

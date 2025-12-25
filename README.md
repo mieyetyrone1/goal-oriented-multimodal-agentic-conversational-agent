@@ -4,42 +4,33 @@ This project implements a modular, goal-oriented conversational agent following 
 The system is designed to evolve incrementally, starting from a core agent loop and expanding to include reflection, memory management, retrieval-augmented generation (RAG), and Model Context Protocol (MCP).
 
 ## Current Status
-**Week 4 – Model Context Protocol (MCP)**
-- Explicit context packets with type, source, priority, and lifetime (TTL)
-- Centralized context controller for assembling LLM prompts
-- Clear separation between:
-  - Conversational memory
-  - Reflective memory
-  - Retrieved knowledge (RAG)
-- Ephemeral retrieval context (no memory pollution)
-- Reflection-aware context injection
-- Deterministic, inspectable prompt construction
-- Planner-compatible context orchestration
+**Week 5 – Model Context Protocol (MCP)**
+- Push-to-talk audio input using Windows microphone
+- Whisper STT transcription for audio input
+- Windows TTS for agent speech output
+- Half-duplex audio management to prevent simultaneous speaking/listening
+- MCP integration: audio state recorded in `ContextPacket.metadata` (`IDLE`, `LISTENING`, `SPEAKING`)
+- Flexible dual-mode input: user can switch per turn between **Audio** and **Text**
+- Existing planner, RAG, memory, reflection, and tool execution remain fully compatible
+- Ephemeral audio packets in MCP for context-aware LLM interactions
+- Debug-friendly inspection of audio and MCP state
 
-MCP serves as the control plane for all context entering the model, enabling predictable behavior, safe memory boundaries, and future extensibility.
-
-## Architecture (Week 4)
-User Input  
-↓  
-Planner (LLM-driven)  
-↓  
-Tool Execution (if needed)  
-↓  
-Retrieval (Embedding Similarity Search)  
-↓  
-Context Assembly (MCP)  
-↓  
-LLM Response  
-↓  
-Memory Update  
-↓  
-Reflection (periodic)
-
-Context Types Managed by MCP:
-- Conversation history (persistent)
-- Retrieved knowledge (TTL-scoped)
-- Reflection summaries (medium-lived)
-- System-level instructions
+## Architecture (Week 5)
+User Input (Audio/Text)
+      ↓
+  Planner (LLM-driven)
+      ↓
+  Tool Execution (if needed)
+      ↓
+  RAG Retrieval + Context Injection
+      ↓
+  LLM Response
+      ↓
+  Memory Update
+      ↓
+  Reflection (periodic)
+      ↓
+  TTS (if audio mode)
 
 ## Setup (Windows)
 
