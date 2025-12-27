@@ -9,7 +9,7 @@ def record_until_enter(
 
     frames = []
 
-    def callback(indata):
+    def callback(indata, frames_count, time, status):
         frames.append(indata.copy())
 
     with sd.InputStream(
